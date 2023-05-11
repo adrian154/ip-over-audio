@@ -1,24 +1,28 @@
 const PI2 = 2 * Math.PI;
+//const data = "".split("").map(char => char.charCodeAt(0));
+//const data = new Array(100).fill(0).map(x=>Math.floor(Math.random()*256));
+const data = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
 
 const SAMPLE_RATE = 48000;
 const CARRIER_FREQ = 12000;
-const SYMBOL_RATE = 5000;
-
-const I = new Array(SAMPLE_RATE),
-      Q = new Array(SAMPLE_RATE);
-
-const data = "The quick brown fox jumps over the lazy dog".split("").map(char => char.charCodeAt(0));
-
+const SYMBOL_RATE = 4000;
 const SYMBOL_LEN = SAMPLE_RATE / SYMBOL_RATE;
+
+const info = document.getElementById("info");
+info.textContent = `Sample rate = ${SAMPLE_RATE} Hz, carrier = ${CARRIER_FREQ} Hz, symbol rate = ${SYMBOL_RATE} baud, symbol length = ${SYMBOL_LEN} samples`;
+
+const I = new Array(data.length * SYMBOL_LEN * 2),
+      Q = new Array(data.length * SYMBOL_LEN * 2);
+
 for(let i = 0; i < SAMPLE_RATE; i++) {
     const symbolIdx = Math.floor(i / SYMBOL_LEN);
-    const byte = data[Math.floor(symbolIdx / 4)] || 0;
+    const byte = data[Math.floor(symbolIdx / 4)];
     const symbol = (byte >> (symbolIdx % 4)) & 0b11;
     I[i] = (symbol & 0b1) ? -1 : 1;
     Q[i] = (symbol & 0b10) ? -1 : 1;
 }
 
-const signal = new Array(SAMPLE_RATE);
+const signal = new Array(I.length);
 
 // modulate
 for(let sample = 0; sample < signal.length; sample++) {
@@ -27,7 +31,7 @@ for(let sample = 0; sample < signal.length; sample++) {
     
     signal[sample] = Math.sin(PI2 * CARRIER_FREQ * t) * I[sample] +
                      Math.cos(PI2 * CARRIER_FREQ * t) * Q[sample] +
-                     Math.random() * 0.1;
+                     Math.random() * 0;
 
 }
 
@@ -53,8 +57,7 @@ const CUTOFF = CARRIER_FREQ / SAMPLE_RATE;
 for(let i = 0; i < filter.length; i++) {   
     //const window = 0.42 - 0.5 * Math.cos(PI2 * i / filter.length) + 0.08 * Math.cos(PI2 * 2 * i / filter.length);
     // use Hamming window to reduce ringing
-    //const window = 0.54 - 0.46 * Math.cos(PI2 * i / filter.length);
-    const window = 1;
+    const window = 0.54 - 0.46 * Math.cos(PI2 * i / filter.length);
     if(i == filter.length / 2)
         filter[i] = PI2 * CUTOFF * window;
     else
@@ -79,12 +82,16 @@ for(const signal of [productI, productQ]) {
         for(let j = 0; j < filter.length; j++) {
             x += signal[i - j] * filter[j];
         }
-        dest[i] = x;
+        dest[i - filter.length / 2] = x;
     }
 }
 
 const canvas = document.getElementById("canvas"),
       ctx = canvas.getContext("2d", {alpha: false});
+
+canvas.style.width = `${canvas.width / devicePixelRatio}px`;
+canvas.style.height = `${canvas.height / devicePixelRatio}px`;
+      
 
 ctx.fillStyle = "#ffffff";
 ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -101,7 +108,7 @@ const plot = (arr, y, color, title) => {
     }
     ctx.stroke();
     ctx.fillStyle = "rgba(0, 0, 0, 75%)";
-    ctx.fillText(title, 2, y - 94);
+    ctx.fillText(title, 2, y - 88);
 };
 
 plot(I, 100, "#ff0000", "in-phase component");
@@ -117,11 +124,38 @@ const constellation = document.getElementById("constellation-diagram"),
 
 constellationCtx.fillStyle = "#ffffff";
 constellationCtx.fillRect(0, 0, constellation.width, constellation.height);
-constellationCtx.fillStyle = "rgba(0, 0, 0, 10%)";
-for(let i = 0; i < signal.length; i++) {
-    constellationCtx.fillRect(
+constellationCtx.fillStyle = "#0000ff";
+ctx.fillStyle = "rgba(0, 0, 0, 30%)";
+for(let i = SYMBOL_LEN / 2; i < signal.length; i += SYMBOL_LEN) {
+    constellationCtx.beginPath();
+    constellationCtx.arc(
         constellation.width * (recoveredI[i] + 1) / 2,
         constellation.height * (recoveredQ[i] + 1) / 2,
-        1, 1
+        2,
+        0, PI2
     );
+    constellationCtx.fill();
+    if(i < canvas.width) {
+        ctx.fillRect(i, 500, 1, 200);
+    }
+}
+
+const eye = document.getElementById("eye-diagram"),
+      eyeCtx = eye.getContext("2d", {alpha: false});
+
+eyeCtx.fillStyle = "#ffffff";
+eyeCtx.fillRect(0, 0, eye.width, eye.height);
+
+const len = 2 * SYMBOL_LEN;
+eyeCtx.strokeStyle = "rgba(0, 0, 0, 10%)";
+for(let i = 0; i < signal.length; i += SYMBOL_LEN) {
+    eyeCtx.beginPath();
+    for(let j = 0; j < len; j++) {
+        const h = eye.height * (recoveredI[i + j] + 1) / 2;
+        if(j == 0)
+            eyeCtx.moveTo(j / len * canvas.width, h);
+        else
+            eyeCtx.lineTo(j / len * canvas.width, h);
+    }
+    eyeCtx.stroke();
 }
