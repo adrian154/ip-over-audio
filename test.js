@@ -1,28 +1,32 @@
+const data = "The quick brown fox jumps over the lazy dog. Jackdaws love my big sphinx of quartz. Pack my box with five dozen liquor jugs. Sphinx of black quartz, judge my vow! How quickly daft jumping zebras vex.";
+const symbols = [];
+for(const char of data) {
+    const byte = char.charCodeAt(0);
+    symbols.push((byte >> 6) & 3, (byte >> 4) & 3, (byte >> 2) & 3, byte & 3);
+}
+
 const PI2 = 2 * Math.PI;
-//const data = "".split("").map(char => char.charCodeAt(0));
-//const data = new Array(100).fill(0).map(x=>Math.floor(Math.random()*256));
-const data = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
 
 const SAMPLE_RATE = 48000;
 const CARRIER_FREQ = 12000;
-const SYMBOL_RATE = 4000;
-const SYMBOL_LEN = SAMPLE_RATE / SYMBOL_RATE;
+const SYMBOL_LEN = 4;
 
 const info = document.getElementById("info");
-info.textContent = `Sample rate = ${SAMPLE_RATE} Hz, carrier = ${CARRIER_FREQ} Hz, symbol rate = ${SYMBOL_RATE} baud, symbol length = ${SYMBOL_LEN} samples`;
+info.textContent = `Sample rate = ${SAMPLE_RATE} Hz, carrier = ${CARRIER_FREQ} Hz, symbol rate = ${SAMPLE_RATE / SYMBOL_LEN} baud, symbol length = ${SYMBOL_LEN} samples`;
 
-const I = new Array(data.length * SYMBOL_LEN * 2),
-      Q = new Array(data.length * SYMBOL_LEN * 2);
+const I = new Array(symbols.length * SYMBOL_LEN),
+      Q = new Array(symbols.length * SYMBOL_LEN);
 
 for(let i = 0; i < SAMPLE_RATE; i++) {
     const symbolIdx = Math.floor(i / SYMBOL_LEN);
-    const byte = data[Math.floor(symbolIdx / 4)];
-    const symbol = (byte >> (symbolIdx % 4)) & 0b11;
+    const symbol = symbols[symbolIdx % symbols.length];
     I[i] = (symbol & 0b1) ? -1 : 1;
     Q[i] = (symbol & 0b10) ? -1 : 1;
 }
 
 const signal = new Array(I.length);
+
+const noise = () => (Math.random()+Math.random()+Math.random()+Math.random()+Math.random()+Math.random()) / 6 - 0.5;
 
 // modulate
 for(let sample = 0; sample < signal.length; sample++) {
@@ -31,7 +35,7 @@ for(let sample = 0; sample < signal.length; sample++) {
     
     signal[sample] = Math.sin(PI2 * CARRIER_FREQ * t) * I[sample] +
                      Math.cos(PI2 * CARRIER_FREQ * t) * Q[sample] +
-                     Math.random() * 0;
+                     noise();
 
 }
 
@@ -135,9 +139,6 @@ for(let i = SYMBOL_LEN / 2; i < signal.length; i += SYMBOL_LEN) {
         0, PI2
     );
     constellationCtx.fill();
-    if(i < canvas.width) {
-        ctx.fillRect(i, 500, 1, 200);
-    }
 }
 
 const eye = document.getElementById("eye-diagram"),
@@ -146,16 +147,16 @@ const eye = document.getElementById("eye-diagram"),
 eyeCtx.fillStyle = "#ffffff";
 eyeCtx.fillRect(0, 0, eye.width, eye.height);
 
-const len = 2 * SYMBOL_LEN;
-eyeCtx.strokeStyle = "rgba(0, 0, 0, 10%)";
-for(let i = 0; i < signal.length; i += SYMBOL_LEN) {
+const len = 2 * SYMBOL_LEN + 1;
+eyeCtx.strokeStyle = "rgba(0, 0, 0, 1%)";
+for(let i = SYMBOL_LEN / 2; i < signal.length; i += SYMBOL_LEN) {
     eyeCtx.beginPath();
     for(let j = 0; j < len; j++) {
         const h = eye.height * (recoveredI[i + j] + 1) / 2;
         if(j == 0)
-            eyeCtx.moveTo(j / len * canvas.width, h);
+            eyeCtx.moveTo(j / (len - 1) * eye.width, h);
         else
-            eyeCtx.lineTo(j / len * canvas.width, h);
+            eyeCtx.lineTo(j / (len - 1) * eye.width, h);
     }
     eyeCtx.stroke();
 }
