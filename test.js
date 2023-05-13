@@ -1,8 +1,14 @@
-const data = "The quick brown fox jumps over the lazy dog. Jackdaws love my big sphinx of quartz. Pack my box with five dozen liquor jugs. Sphinx of black quartz, judge my vow! How quickly daft jumping zebras vex.";
+document.querySelectorAll("canvas").forEach(canvas => {
+    canvas.style.width = `${canvas.width / devicePixelRatio}px`;
+    canvas.style.height = `${canvas.height / devicePixelRatio}px`;
+});
+
+//const data = "The quick brown fox jumps over the lazy dog. Jackdaws love my big sphinx of quartz. Pack my box with five dozen liquor jugs. Sphinx of black quartz, judge my vow! How quickly daft jumping zebras vex.";
 const symbols = [];
-for(const char of data) {
-    const byte = char.charCodeAt(0);
-    symbols.push((byte >> 6) & 3, (byte >> 4) & 3, (byte >> 2) & 3, byte & 3);
+for(let i = 0; i < 1000; i++) {
+    const byte = Math.floor(Math.random()*256);
+    symbols.push((byte >> 4)&15, byte&15);
+    //symbols.push((byte >> 6) & 3, (byte >> 4) & 3, (byte >> 2) & 3, byte & 3);
 }
 
 const PI2 = 2 * Math.PI;
@@ -17,14 +23,14 @@ info.textContent = `Sample rate = ${SAMPLE_RATE} Hz, carrier = ${CARRIER_FREQ} H
 const I = new Array(symbols.length * SYMBOL_LEN),
       Q = new Array(symbols.length * SYMBOL_LEN);
 
-for(let i = 0; i < SAMPLE_RATE; i++) {
+for(let i = 0; i < I.length; i++) {
     const symbolIdx = Math.floor(i / SYMBOL_LEN);
     const symbol = symbols[symbolIdx % symbols.length];
-    I[i] = (symbol & 0b1) ? -1 : 1;
-    Q[i] = (symbol & 0b10) ? -1 : 1;
+    I[i] = [-1, -1/3, 1/3, 1][symbol&3];
+    Q[i] = [-1, -1/3, 1/3, 1][(symbol>>2)&3];
 }
 
-const signal = new Array(I.length);
+const signal = new Float32Array(I.length);
 
 const noise = () => (Math.random()+Math.random()+Math.random()+Math.random()+Math.random()+Math.random()) / 6 - 0.5;
 
@@ -35,7 +41,7 @@ for(let sample = 0; sample < signal.length; sample++) {
     
     signal[sample] = Math.sin(PI2 * CARRIER_FREQ * t) * I[sample] +
                      Math.cos(PI2 * CARRIER_FREQ * t) * Q[sample] +
-                     noise();
+                     noise()*0;
 
 }
 
@@ -93,14 +99,15 @@ for(const signal of [productI, productQ]) {
 const canvas = document.getElementById("canvas"),
       ctx = canvas.getContext("2d", {alpha: false});
 
-canvas.style.width = `${canvas.width / devicePixelRatio}px`;
-canvas.style.height = `${canvas.height / devicePixelRatio}px`;
-      
-
 ctx.fillStyle = "#ffffff";
 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 const plot = (arr, y, color, title) => {
+    ctx.strokeStyle = "rgba(0, 0, 0, 50%)";
+    ctx.beginPath();
+    ctx.moveTo(0, y - 50);
+    ctx.lineTo(canvas.width, y - 50);
+    ctx.stroke();
     ctx.strokeStyle = color;
     ctx.beginPath();
     for(let i = 0; i < canvas.width; i++) {
@@ -160,3 +167,11 @@ for(let i = SYMBOL_LEN / 2; i < signal.length; i += SYMBOL_LEN) {
     }
     eyeCtx.stroke();
 }
+
+const download = () => {
+    const blob = new Blob([signal.buffer]);
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "signal.raw";
+    link.click();
+};
