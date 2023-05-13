@@ -23,8 +23,7 @@ for(let i = 0; i < signal.length; i++) {
     const Q = (symbol & 0b10) ? -1 : 1;
 
     const t = i / QAM.SAMPLE_RATE;
-    signal[i] = Math.sin(PI2 * QAM.CARRIER_FREQ * t) * I +
-                Math.cos(PI2 * QAM.CARRIER_FREQ * t) * Q;
+    signal[i] = (Math.sin(PI2 * QAM.CARRIER_FREQ * t) * I + Math.cos(PI2 * QAM.CARRIER_FREQ * t) * Q) / 2;
 
 }
 

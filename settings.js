@@ -8,5 +8,5 @@
 })({
     SAMPLE_RATE: 48000,
     CARRIER_FREQ: 12000,
-    SYMBOL_LEN: 10
+    SYMBOL_LEN: 4
 });

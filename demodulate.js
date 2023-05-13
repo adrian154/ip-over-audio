@@ -1,3 +1,7 @@
+const p = document.getElementById("settings");
+const symbolRate = QAM.SAMPLE_RATE / QAM.SYMBOL_LEN
+p.textContent = `sample rate = ${QAM.SAMPLE_RATE} Hz, carrier = ${QAM.CARRIER_FREQ} Hz, symbol length = ${QAM.SYMBOL_LEN} samples / symbol rate = ${symbolRate} baud, data rate = ${symbolRate * 2} kbit/s`;
+
 const PI2 = 2 * Math.PI;
 
 // compute low pass filter kernel
@@ -80,19 +84,15 @@ const drawWaveforms = (I, Q) => {
 const drawConstellation = (I, Q) => {
 
     const canvas = document.getElementById("iq"),
-          ctx = canvas.getContext("2d", {alpha: false});
+          ctx = canvas.getContext("2d", {alpha: true});
 
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = "#0000ff";
+    ctx.fillStyle = "rgba(0, 0, 255, 25%)";
     for(let i = QAM.SYMBOL_LEN / 2; i < I.length; i += QAM.SYMBOL_LEN) {
-        ctx.beginPath();
-        ctx.arc(
-            canvas.width * (I[i] + 1) / 2,
-            canvas.height * (Q[i] + 1) / 2,
-            2, 0, PI2
-        );
+        ctx.beginPath()
+        ctx.arc(canvas.width * (I[i] + 1) / 2, canvas.height * (Q[i] + 1) / 2, 2, 0, PI2);
         ctx.fill();
     }
 
@@ -107,6 +107,7 @@ const drawEyePattern = (I, Q) => {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const windowLen = 3 * QAM.SYMBOL_LEN;
+    ctx.strokeStyle = "rgba(0, 0, 0, 10%)";
     for(let i = QAM.SYMBOL_LEN / 2; i < I.length; i += QAM.SYMBOL_LEN) {
         ctx.beginPath();
         for(let j = 0; j <= windowLen; j++) {
@@ -121,47 +122,53 @@ const drawEyePattern = (I, Q) => {
 
 };
 
+let phaseAdjust = 0;
+let signal = null;
+
+const demodulate = () => {
+
+    // extract I and Q
+    const unfilteredI = new Float32Array(signal.length),
+            unfilteredQ = new Float32Array(signal.length);
+
+    for(let i = 0; i < signal.length; i++) {
+        const t = i / QAM.SAMPLE_RATE;
+        unfilteredI[i] = signal[i] * Math.sin(PI2 * QAM.CARRIER_FREQ * t + phaseAdjust);
+        unfilteredQ[i] = signal[i] * Math.cos(PI2 * QAM.CARRIER_FREQ * t + phaseAdjust);
+    }
+
+    // filter I and Q to remove high-frequency components
+    const filteredI = new Float32Array(signal.length),
+            filteredQ = new Float32Array(signal.length);
+    
+    for(const [signal, filtered] of [[unfilteredI, filteredI], [unfilteredQ, filteredQ]]) {
+        for(let i = filter.length; i < signal.length; i++) {
+            let x = 0;
+            for(let j = 0; j < filter.length; j++) {
+                x += signal[i - j] * filter[j];
+            }
+            filtered[i - filter.length / 2] = x;
+        }
+    }
+
+    // draw waveforms
+    drawWaveforms(filteredI, filteredQ);
+
+    // draw constellation diagram
+    drawConstellation(filteredI, filteredQ);
+
+    // draw eye pattern
+    drawEyePattern(filteredI, filteredQ);
+
+};
+
 document.getElementById("file").addEventListener("input", event => {
     
     const reader = new FileReader();
     reader.readAsArrayBuffer(event.target.files[0]);
     reader.onload = () => {
-        
-        const signal = new Float32Array(reader.result);
-        
-        // extract I and Q
-        const unfilteredI = new Float32Array(signal.length),
-              unfilteredQ = new Float32Array(signal.length);
-
-        for(let i = 0; i < signal.length; i++) {
-            const t = i / QAM.SAMPLE_RATE;
-            unfilteredI[i] = signal[i] * Math.sin(PI2 * QAM.CARRIER_FREQ * t);
-            unfilteredQ[i] = signal[i] * Math.cos(PI2 * QAM.CARRIER_FREQ * t);
-        }
-
-        // filter I and Q to remove high-frequency components
-        const filteredI = new Float32Array(signal.length),
-              filteredQ = new Float32Array(signal.length);
-        
-        for(const [signal, filtered] of [[unfilteredI, filteredI], [unfilteredQ, filteredQ]]) {
-            for(let i = filter.length; i < signal.length; i++) {
-                let x = 0;
-                for(let j = 0; j < filter.length; j++) {
-                    x += signal[i - j] * filter[j];
-                }
-                filtered[i - filter.length / 2] = x;
-            }
-        }
-
-        // draw waveforms
-        drawWaveforms(filteredI, filteredQ);
-
-        // draw constellation diagram
-        drawConstellation(filteredI, filteredQ);
-
-        // draw eye pattern
-        drawEyePattern(filteredI, filteredQ);
-
+        signal = new Float32Array(reader.result);
+        demodulate();
     };
 
 });
