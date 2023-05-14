@@ -1,6 +1,7 @@
 const p = document.getElementById("settings");
-const symbolRate = QAM.SAMPLE_RATE / QAM.SYMBOL_LEN
-p.textContent = `sample rate = ${QAM.SAMPLE_RATE} Hz, carrier = ${QAM.CARRIER_FREQ} Hz, symbol length = ${QAM.SYMBOL_LEN} samples / symbol rate = ${symbolRate} baud, data rate = ${symbolRate * 2} kbit/s`;
+const symbolRate = QAM.SAMPLE_RATE / QAM.SYMBOL_LEN,
+      bitsPerSymbol = QAM.MODE === "16-QAM" ? 4 : 2;
+p.textContent = `sample rate = ${QAM.SAMPLE_RATE} Hz, carrier = ${QAM.CARRIER_FREQ} Hz, symbol length = ${QAM.SYMBOL_LEN} samples / symbol rate = ${symbolRate} baud, data rate = ${symbolRate * bitsPerSymbol} kbit/s`;
 
 const PI2 = 2 * Math.PI;
 
@@ -107,7 +108,7 @@ const drawEyePattern = (I, Q) => {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const windowLen = 3 * QAM.SYMBOL_LEN;
-    ctx.strokeStyle = "rgba(0, 0, 0, 10%)";
+    ctx.strokeStyle = "rgba(0, 0, 0, 1%)";
     for(let i = QAM.SYMBOL_LEN / 2; i < I.length; i += QAM.SYMBOL_LEN) {
         ctx.beginPath();
         for(let j = 0; j <= windowLen; j++) {
@@ -129,7 +130,7 @@ const demodulate = () => {
 
     // extract I and Q
     const unfilteredI = new Float32Array(signal.length),
-            unfilteredQ = new Float32Array(signal.length);
+          unfilteredQ = new Float32Array(signal.length);
 
     for(let i = 0; i < signal.length; i++) {
         const t = i / QAM.SAMPLE_RATE;
@@ -139,7 +140,7 @@ const demodulate = () => {
 
     // filter I and Q to remove high-frequency components
     const filteredI = new Float32Array(signal.length),
-            filteredQ = new Float32Array(signal.length);
+          filteredQ = new Float32Array(signal.length);
     
     for(const [signal, filtered] of [[unfilteredI, filteredI], [unfilteredQ, filteredQ]]) {
         for(let i = filter.length; i < signal.length; i++) {
@@ -151,13 +152,8 @@ const demodulate = () => {
         }
     }
 
-    // draw waveforms
     drawWaveforms(filteredI, filteredQ);
-
-    // draw constellation diagram
     drawConstellation(filteredI, filteredQ);
-
-    // draw eye pattern
     drawEyePattern(filteredI, filteredQ);
 
 };
