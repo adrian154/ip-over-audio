@@ -22,8 +22,11 @@ if(QAM.MODE === "4-QAM") {
         const word = bytes[i] | ((bytes[i + 1]||0) << 8) | ((bytes[i + 2]||0) << 16);
         symbols.push(word & 0b111111, (word>>6) & 0b111111, (word>>12) & 0b111111, (word>>18) & 0b111111);
     }
+} else if(QAM.MODE === "256-QAM") {
+    for(const byte of bytes) {
+        symbols.push(byte);
+    }
 }
-
 
 // generate signal
 const signal = new Float32Array(symbols.length * QAM.SYMBOL_LEN);
@@ -45,6 +48,9 @@ for(let i = 0; i < signal.length; i++) {
     } else if(QAM.MODE === "64-QAM") {
         I = [-1, -5/7, -3/7, -1/7, 1/7, 3/7, 5/7, 1][symbol & 0b111];
         Q = [-1, -5/7, -3/7, -1/7, 1/7, 3/7, 5/7, 1][(symbol >> 3) & 0b111]
+    } else if(QAM.MODE === "256-QAM") {
+        I = [-1, -13/15, -11/15, -9/15, -7/15, -5/15, -3/15, -1/15, 1/15, 3/15, 5/15, 7/15, 9/15, 11/15, 13/15, 1][symbol & 0b1111];
+        Q = [-1, -13/15, -11/15, -9/15, -7/15, -5/15, -3/15, -1/15, 1/15, 3/15, 5/15, 7/15, 9/15, 11/15, 13/15, 1][(symbol >> 4)&0b1111];
     }
 
     basebandI[i] = I;

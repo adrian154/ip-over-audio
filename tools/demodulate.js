@@ -1,9 +1,10 @@
 const p = document.getElementById("settings");
 const symbolRate = QAM.SAMPLE_RATE / QAM.SYMBOL_LEN,
-      bitsPerSymbol = QAM.MODE === "64-QAM" ? 8 :
+      bitsPerSymbol = QAM.MODE === "256-QAM" ? 8 :
+                      QAM.MODE === "64-QAM" ? 6 :
                       QAM.MODE === "16-QAM" ? 4 :
                                               2;
-p.textContent = `sample rate = ${QAM.SAMPLE_RATE} Hz, carrier = ${QAM.CARRIER_FREQ} Hz, symbol length = ${QAM.SYMBOL_LEN} samples / symbol rate = ${symbolRate} baud, data rate = ${symbolRate * bitsPerSymbol} kbit/s`;
+p.textContent = `sample rate = ${QAM.SAMPLE_RATE} Hz, carrier = ${QAM.CARRIER_FREQ} Hz, symbol length = ${QAM.SYMBOL_LEN} samples, symbol rate = ${symbolRate} baud, data rate = ${symbolRate * bitsPerSymbol} kbit/s`;
 
 const PI2 = 2 * Math.PI;
 
@@ -131,10 +132,10 @@ const drawConstellation = (I, Q) => {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = "rgba(0, 255, 0, 25%)";
+    ctx.fillStyle = "#00ff00";
     for(let i = offset; i < I.length; i += QAM.SYMBOL_LEN) {
         ctx.beginPath()
-        ctx.arc(canvas.width * (I[i] + 1) / 2, canvas.height * (Q[i] + 1) / 2, 2, 0, PI2);
+        ctx.arc(canvas.width * (I[i] + 1) / 2, canvas.height * (Q[i] + 1) / 2, 1, 0, PI2);
         ctx.fill();
     }
 
@@ -206,8 +207,8 @@ const demodulate = () => {
             qx += unfilteredQ[i - j] * filter[j];
         }
 
-        filteredI[i - filter.length / 2] = ix * 2;
-        filteredQ[i - filter.length / 2 + 1] = qx * 2;
+        filteredI[i] = ix * 2;
+        filteredQ[i+1] = qx * 2;
 
     }
 
@@ -224,6 +225,7 @@ document.getElementById("file").addEventListener("input", event => {
     reader.readAsArrayBuffer(event.target.files[0]);
     reader.onload = () => {
         signal = new Float32Array(reader.result);
+        document.getElementById("signalinfo").textContent = `signal length = ${signal.length} samples / ${signal.length / QAM.SAMPLE_RATE} seconds`
         demodulate();
     };
 
