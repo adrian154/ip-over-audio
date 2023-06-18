@@ -1,6 +1,8 @@
 const p = document.getElementById("settings");
 const symbolRate = QAM.SAMPLE_RATE / QAM.SYMBOL_LEN,
-      bitsPerSymbol = QAM.MODE === "16-QAM" ? 4 : 2;
+      bitsPerSymbol = QAM.MODE === "64-QAM" ? 8 :
+                      QAM.MODE === "16-QAM" ? 4 :
+                                              2;
 p.textContent = `sample rate = ${QAM.SAMPLE_RATE} Hz, carrier = ${QAM.CARRIER_FREQ} Hz, symbol length = ${QAM.SYMBOL_LEN} samples / symbol rate = ${symbolRate} baud, data rate = ${symbolRate * bitsPerSymbol} kbit/s`;
 
 const PI2 = 2 * Math.PI;
@@ -8,9 +10,10 @@ const PI2 = 2 * Math.PI;
 // compute low pass filter kernel
 const createFilter = () => {
 
-    const filter = new Array(100);
+    const filter = new Array(64);
     
     const CUTOFF = QAM.CARRIER_FREQ / QAM.SAMPLE_RATE;
+
     for(let i = 0; i < filter.length; i++) {   
         // use Hamming window to reduce ringing
         const window = 0.54 - 0.46 * Math.cos(PI2 * i / filter.length);
@@ -44,7 +47,7 @@ const drawWaveforms = (I, Q) => {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const plotWave = (signal, x, y, width, height) => {
+    const plotWave = (signal, x, y, width, height, color) => {
 
         // draw boundary lines
         ctx.strokeStyle = "rgba(0, 0, 0, 25%)";
@@ -63,22 +66,60 @@ const drawWaveforms = (I, Q) => {
         ctx.lineTo(x + width, y + height)
         ctx.stroke();
 
-        ctx.strokeStyle = "#ff0000";
+        ctx.strokeStyle = color;
         ctx.beginPath();
-        for(let i = 0; i < width; i++) {
-            const pointY = y + height - (signal[i] + 1) / 2 * height;
+        for(let i = 0; i < width / 2; i++) {
+            const pointY = y + height - (signal[i * 2] + 1) / 2 * height;
             if(i == 0)
-                ctx.moveTo(x + i, pointY);
+                ctx.moveTo(x + i * 2, pointY);
             else
-                ctx.lineTo(x + i, pointY);
+                ctx.lineTo(x + i * 2, pointY);
         }
         ctx.stroke();
 
     };
 
     const h = (canvas.height - 20) / 2;
-    plotWave(I, 10, 10, canvas.width - 20, h);
-    plotWave(Q, 10, 10 + h, canvas.width - 20, h);
+    plotWave(I, 10, 10, canvas.width - 20, h, "#ff0000");
+    plotWave(Q, 10, 10 + h, canvas.width - 20, h, "#0000ff");
+
+};
+
+const drawSpectrum = (signal) => {
+
+    const canvas = document.getElementById("spectrum"),
+          ctx = canvas.getContext("2d", {alpha: false});
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const spd = new Array(canvas.width);
+    const WL = 1024;
+    for(let x = 1; x < canvas.width; x++) {
+        
+        const freq = x / canvas.width * (QAM.SAMPLE_RATE / 2);
+        let Re = 0, Im = 0;
+        for(let i = 0; i < WL; i++) {
+            const t = i / QAM.SAMPLE_RATE;
+            Re += Math.sin(2*Math.PI*t*freq)*signal[i];
+            Im += Math.cos(2*Math.PI*t*freq)*signal[i];
+        }
+        spd[x] = Math.log(Re**2 + Im**2);
+        //spd[x] = Re**2+Im**2;
+    }
+
+    const max = spd.reduce((a,c) => Math.max(a, c), -Infinity),
+          min = spd.reduce((a,c) => Math.min(a, c), Infinity);
+
+    ctx.beginPath();
+    for(let x = 0; x < canvas.width; x++) {
+        const y = canvas.height - ((spd[x]-min)/(max-min)*(canvas.height-20));
+        if(x == 0)
+            ctx.moveTo(x, y);
+        else
+            ctx.lineTo(x, y);
+    }
+    ctx.stroke();
 
 };
 
@@ -90,8 +131,8 @@ const drawConstellation = (I, Q) => {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = "rgba(0, 0, 255, 25%)";
-    for(let i = QAM.SYMBOL_LEN / 2; i < I.length; i += QAM.SYMBOL_LEN) {
+    ctx.fillStyle = "rgba(0, 255, 0, 25%)";
+    for(let i = offset; i < I.length; i += QAM.SYMBOL_LEN) {
         ctx.beginPath()
         ctx.arc(canvas.width * (I[i] + 1) / 2, canvas.height * (Q[i] + 1) / 2, 2, 0, PI2);
         ctx.fill();
@@ -107,12 +148,26 @@ const drawEyePattern = (I, Q) => {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const windowLen = 3 * QAM.SYMBOL_LEN;
-    ctx.strokeStyle = "rgba(0, 0, 0, 1%)";
-    for(let i = QAM.SYMBOL_LEN / 2; i < I.length; i += QAM.SYMBOL_LEN) {
+    const windowLen = 2 * QAM.SYMBOL_LEN;
+    
+    ctx.strokeStyle = "rgba(255, 0, 0, 5%)";
+    for(let i = offset; i < I.length; i += QAM.SYMBOL_LEN) {
         ctx.beginPath();
         for(let j = 0; j <= windowLen; j++) {
             const y = canvas.height * (I[i + j] + 1) / 2;
+            if(j == 0)
+                ctx.moveTo(j / windowLen * canvas.width, y);
+            else
+                ctx.lineTo(j / windowLen * canvas.width, y);
+        }
+        ctx.stroke();
+    }
+
+    ctx.strokeStyle = "rgba(0, 0, 255, 5%)";
+    for(let i = offset; i < Q.length; i += QAM.SYMBOL_LEN) {
+        ctx.beginPath();
+        for(let j = 0; j <= windowLen; j++) {
+            const y = canvas.height * (Q[i + j] + 1) / 2;
             if(j == 0)
                 ctx.moveTo(j / windowLen * canvas.width, y);
             else
@@ -125,6 +180,7 @@ const drawEyePattern = (I, Q) => {
 
 let phaseAdjust = 0;
 let signal = null;
+let offset = Math.floor(QAM.SYMBOL_LEN / 2);
 
 const demodulate = () => {
 
@@ -141,20 +197,24 @@ const demodulate = () => {
     // filter I and Q to remove high-frequency components
     const filteredI = new Float32Array(signal.length),
           filteredQ = new Float32Array(signal.length);
-    
-    for(const [signal, filtered] of [[unfilteredI, filteredI], [unfilteredQ, filteredQ]]) {
-        for(let i = filter.length; i < signal.length; i++) {
-            let x = 0;
-            for(let j = 0; j < filter.length; j++) {
-                x += signal[i - j] * filter[j];
-            }
-            filtered[i - filter.length / 2] = x;
+
+    for(let i = filter.length; i < signal.length; i++) {
+
+        let ix = 0, qx = 0;
+        for(let j = 0; j < filter.length; j++) {
+            ix += unfilteredI[i - j] * filter[j];
+            qx += unfilteredQ[i - j] * filter[j];
         }
+
+        filteredI[i - filter.length / 2] = ix * 2;
+        filteredQ[i - filter.length / 2 + 1] = qx * 2;
+
     }
 
     drawWaveforms(filteredI, filteredQ);
     drawConstellation(filteredI, filteredQ);
     drawEyePattern(filteredI, filteredQ);
+    drawSpectrum(signal);
 
 };
 

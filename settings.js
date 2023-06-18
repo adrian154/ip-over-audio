@@ -8,6 +8,6 @@
 })({
     SAMPLE_RATE: 48000,
     CARRIER_FREQ: 12000,
-    SYMBOL_LEN: 4,
-    MODE: "16-QAM"
+    SYMBOL_LEN: 2,
+    MODE: "64-QAM"
 });
