@@ -9,7 +9,7 @@ p.textContent = `sample rate = ${QAM.SAMPLE_RATE} Hz, carrier = ${QAM.CARRIER_FR
 const PI2 = 2 * Math.PI;
 
 // compute low pass filter kernel
-const createFilter = () => {
+const createLowpassFilter = () => {
 
     const filter = new Array(64);
     
@@ -24,7 +24,23 @@ const createFilter = () => {
             filter[i] = Math.sin(PI2 * CUTOFF * (i - filter.length / 2)) / (i - filter.length / 2) * window;
     }
 
-    // normalize kernel
+    return filter;
+
+};
+
+
+const createFilter = () => {
+
+    const lowpass = createLowpassFilter(),
+          rrc = RRC(QAM)
+
+    const filter = new Array(lowpass.length + rrc.length).fill(0);
+    for(let i = 0; i < lowpass.length; i++) {
+        for(let j = 0; j < rrc.length; j++) {
+            filter[i + j] += lowpass[i] * rrc[j];
+        }
+    }
+
     let sum = 0;
     for(const x of filter) {
         sum += x;
@@ -33,6 +49,9 @@ const createFilter = () => {
     for(let i = 0; i < filter.length; i++) {
         filter[i] /= sum;
     }
+
+    return filter;
+
 
     return filter;
 
@@ -208,7 +227,7 @@ const demodulate = () => {
         }
 
         filteredI[i] = ix * 2;
-        filteredQ[i+1] = qx * 2;
+        filteredQ[i] = qx * 2;
 
     }
 

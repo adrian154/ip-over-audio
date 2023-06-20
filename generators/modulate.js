@@ -1,8 +1,29 @@
 const QAM = require("../settings.js");
+const rrc = require("../rrc.js")(QAM);
 const writeWav = require("./wav.js");
 const fs = require("fs");
 
 const PI2 = 2 * Math.PI;
+/*
+// create raised-cosine pulse
+const sinc = x => Math.sin(Math.PI*x)/(Math.PI*x);
+const pulse = new Array(64),
+      ROLLOFF = 0.3;
+for(let i = 0; i < pulse.length; i++) {
+    const t = (i - pulse.length / 2);
+    if(i == pulse.length / 2)
+        pulse[i] = 1 / QAM.SYMBOL_LEN * Math.cos(Math.PI*ROLLOFF*t/QAM.SYMBOL_LEN) / (1 - (2*ROLLOFF*t/QAM.SYMBOL_LEN)**2)
+    else
+        pulse[i] = 1 / QAM.SYMBOL_LEN * sinc(t / QAM.SYMBOL_LEN) * Math.cos(Math.PI*ROLLOFF*t/QAM.SYMBOL_LEN) / (1 - (2*ROLLOFF*t/QAM.SYMBOL_LEN)**2)
+}
+
+for(let i = 0; i < pulse.length; i++) pulse[i]*=4;
+
+console.log("PULSE:");
+console.log(pulse.join("\n"));
+console.log("RRC:");
+console.log(rrc.join("\n"));
+*/
 
 // read bytes
 const bytes = fs.readFileSync(process.argv[2]);
@@ -28,16 +49,15 @@ if(QAM.MODE === "4-QAM") {
     }
 }
 
-// generate signal
-const signal = new Float32Array(symbols.length * QAM.SYMBOL_LEN);
+// generate pulse-shaped baseband
 const basebandI = new Float32Array(symbols.length * QAM.SYMBOL_LEN),
       basebandQ = new Float32Array(symbols.length * QAM.SYMBOL_LEN);
 
-for(let i = 0; i < signal.length; i++) {
+const signal = new Float32Array(symbols.length * QAM.SYMBOL_LEN);
 
-    // determine I/Q component
-    const symbol = symbols[Math.floor(i / QAM.SYMBOL_LEN)];
+for(let i = 0; i < symbols.length; i++) {
 
+    const symbol = symbols[i];
     let I = 0, Q = 0;
     if(QAM.MODE === "4-QAM") {
         I = [-1, 1][symbol & 0b1];
@@ -53,15 +73,17 @@ for(let i = 0; i < signal.length; i++) {
         Q = [-1, -13/15, -11/15, -9/15, -7/15, -5/15, -3/15, -1/15, 1/15, 3/15, 5/15, 7/15, 9/15, 11/15, 13/15, 1][(symbol >> 4)&0b1111];
     }
 
-    basebandI[i] = I;
-    basebandQ[i] = Q;
-
-    const t = i / QAM.SAMPLE_RATE;
-    signal[i] = (Math.sin(PI2 * QAM.CARRIER_FREQ * t) * I + Math.cos(PI2 * QAM.CARRIER_FREQ * t) * Q) / 2;
-    if(isNaN(signal[i])) {
-        throw new Error();
+    // add pulse    
+    for(let j = 0; j < rrc.length; j++) {
+        basebandI[i * QAM.SYMBOL_LEN + j] += rrc[j] * I;
+        basebandQ[i * QAM.SYMBOL_LEN + j] += rrc[j] * Q;
     }
 
+}
+
+for(let i = 0; i < signal.length; i++) {
+    const t = i / QAM.SAMPLE_RATE;
+    signal[i] = (Math.sin(PI2 * QAM.CARRIER_FREQ * t) * basebandI[i] + Math.cos(PI2 * QAM.CARRIER_FREQ * t) * basebandQ[i]) / 2;
 }
 
 // write signal

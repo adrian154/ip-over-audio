@@ -50,7 +50,7 @@ module.exports = (filename, channels, sampleRate) => {
             try {
                 buf.writeInt16LE(Math.trunc(channel[i] * 32767));
             } catch(err) {
-                console.log("bad value: " + sample);
+                console.log("bad value: " + channel[i]);
                 throw err;
             }
         }
