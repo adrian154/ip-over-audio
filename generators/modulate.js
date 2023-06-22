@@ -55,22 +55,29 @@ const basebandI = new Float32Array(symbols.length * QAM.SYMBOL_LEN),
 
 const signal = new Float32Array(symbols.length * QAM.SYMBOL_LEN);
 
+const levels = [
+    [-1, 1],
+    [-3, -1, 1, 3],
+    [-7, -5, -3, -1, 1, 3, 5, 7],
+    [-15, -13, -11, -9, -7, -5, -3, -1, 1, 3, 5, 7, 9, 11, 13, 15]
+];
+
 for(let i = 0; i < symbols.length; i++) {
 
     const symbol = symbols[i];
     let I = 0, Q = 0;
     if(QAM.MODE === "4-QAM") {
-        I = [-1, 1][symbol & 0b1];
-        Q = [-1, 1][(symbol & 0b10) >> 1];
+        I = levels[0][symbol & 0b1];
+        Q = levels[0][(symbol & 0b10) >> 1];
     } else if(QAM.MODE === "16-QAM") {
-        I = [-1, -1/3, 1/3, 1][symbol & 0b11];
-        Q = [-1, -1/3, 1/3, 1][(symbol >> 2) & 0b11];
+        I = levels[1][symbol & 0b11];
+        Q = levels[1][(symbol >> 2) & 0b11];
     } else if(QAM.MODE === "64-QAM") {
-        I = [-1, -5/7, -3/7, -1/7, 1/7, 3/7, 5/7, 1][symbol & 0b111];
-        Q = [-1, -5/7, -3/7, -1/7, 1/7, 3/7, 5/7, 1][(symbol >> 3) & 0b111]
+        I = levels[2][symbol & 0b111];
+        Q = levels[2][(symbol >> 3) & 0b111]
     } else if(QAM.MODE === "256-QAM") {
-        I = [-1, -13/15, -11/15, -9/15, -7/15, -5/15, -3/15, -1/15, 1/15, 3/15, 5/15, 7/15, 9/15, 11/15, 13/15, 1][symbol & 0b1111];
-        Q = [-1, -13/15, -11/15, -9/15, -7/15, -5/15, -3/15, -1/15, 1/15, 3/15, 5/15, 7/15, 9/15, 11/15, 13/15, 1][(symbol >> 4)&0b1111];
+        I = levels[3][symbol & 0b1111];
+        Q = levels[3][(symbol >> 4)&0b1111];
     }
 
     // add pulse    
@@ -81,13 +88,19 @@ for(let i = 0; i < symbols.length; i++) {
 
 }
 
+let max = 0;
 for(let i = 0; i < signal.length; i++) {
     const t = i / QAM.SAMPLE_RATE;
-    signal[i] = (Math.sin(PI2 * QAM.CARRIER_FREQ * t) * basebandI[i] + Math.cos(PI2 * QAM.CARRIER_FREQ * t) * basebandQ[i]) / 2;
+    signal[i] = (Math.sin(PI2 * QAM.CARRIER_FREQ * t) * basebandI[i] + Math.cos(PI2 * QAM.CARRIER_FREQ * t) * basebandQ[i]);
+    max = Math.max(max, Math.abs(signal[i]));
+}
+
+// scale signal
+for(let i = 0; i < signal.length; i++) {
+    signal[i] /= max;
 }
 
 // write signal
 fs.writeFileSync("signals/basebandI.raw", Buffer.from(basebandI.buffer));
 fs.writeFileSync("signals/modulated.raw", Buffer.from(signal.buffer));
 writeWav("signals/modulated.wav", [signal], QAM.SAMPLE_RATE);
-writeWav("signals/baseband.wav", [basebandI, basebandQ], QAM.SAMPLE_RATE);

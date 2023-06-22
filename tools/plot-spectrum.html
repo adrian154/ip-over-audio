@@ -33,6 +33,8 @@ let spd;
 
 const drawSpectrum = (signal) => {
 
+    console.log(signal);
+
     const canvas = document.getElementById("spectrum"),
           ctx = canvas.getContext("2d", {alpha: false});
 
@@ -45,7 +47,7 @@ const drawSpectrum = (signal) => {
           graphHeight = canvas.height - YMARGIN * 2;
 
     spd = new Array(graphWidth);
-    const WL = 1024;
+    const WL = 4096;
     for(let x = 1; x < spd.length; x++) {
         
         const freq = x / spd.length * MAX_FREQ;

@@ -1,12 +1,12 @@
 const p = document.getElementById("settings");
+
 const symbolRate = QAM.SAMPLE_RATE / QAM.SYMBOL_LEN,
-      bitsPerSymbol = QAM.MODE === "256-QAM" ? 8 :
-                      QAM.MODE === "64-QAM" ? 6 :
-                      QAM.MODE === "16-QAM" ? 4 :
-                                              2;
+      bitsPerSymbol = {"4-QAM": 2, "16-QAM": 4, "64-QAM": 6, "256-QAM": 8}[QAM.MODE];
+
 p.textContent = `sample rate = ${QAM.SAMPLE_RATE} Hz, carrier = ${QAM.CARRIER_FREQ} Hz, symbol length = ${QAM.SYMBOL_LEN} samples, symbol rate = ${symbolRate} baud, data rate = ${symbolRate * bitsPerSymbol} kbit/s`;
 
 const PI2 = 2 * Math.PI;
+const ORDER = {"4-QAM": 2, "16-QAM": 4, "64-QAM": 8, "256-QAM": 16};
 
 // compute low pass filter kernel
 const createLowpassFilter = () => {
@@ -49,9 +49,6 @@ const createFilter = () => {
     for(let i = 0; i < filter.length; i++) {
         filter[i] /= sum;
     }
-
-    return filter;
-
 
     return filter;
 
@@ -143,7 +140,9 @@ const drawSpectrum = (signal) => {
 
 };
 
-const drawConstellation = (I, Q) => {
+const lerp = (x1, x2, frac) => x1 + (x2 - x1) * frac;
+
+const drawConstellation = (points) => {
 
     const canvas = document.getElementById("iq"),
           ctx = canvas.getContext("2d", {alpha: true});
@@ -151,10 +150,25 @@ const drawConstellation = (I, Q) => {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = "#00ff00";
-    for(let i = offset; i < I.length; i += QAM.SYMBOL_LEN) {
-        ctx.beginPath()
-        ctx.arc(canvas.width * (I[i] + 1) / 2, canvas.height * (Q[i] + 1) / 2, 1, 0, PI2);
+    // draw grid
+    const order = ORDER[QAM.MODE];
+    for(let i = 1; i < order; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i / order * canvas.width, 0);
+        ctx.lineTo(i / order * canvas.width, canvas.height);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i / order * canvas.height);
+        ctx.lineTo(canvas.width, i / order * canvas.width);
+        ctx.stroke();
+    }
+
+    // draw points
+    ctx.fillStyle = "#3388ff";
+    const scale = (order+1)/order;
+    for(const point of points) {
+        ctx.beginPath();
+        ctx.arc(canvas.width * (point[0]/scale + 1) / 2, canvas.height * (point[1]/scale + 1) / 2, 1, 0, PI2);
         ctx.fill();
     }
 
@@ -171,7 +185,7 @@ const drawEyePattern = (I, Q) => {
     const windowLen = 2 * QAM.SYMBOL_LEN;
     
     ctx.strokeStyle = "rgba(255, 0, 0, 5%)";
-    for(let i = offset; i < I.length; i += QAM.SYMBOL_LEN) {
+    for(let i = Math.floor(offset); i < I.length; i += QAM.SYMBOL_LEN) {
         ctx.beginPath();
         for(let j = 0; j <= windowLen; j++) {
             const y = canvas.height * (I[i + j] + 1) / 2;
@@ -184,7 +198,7 @@ const drawEyePattern = (I, Q) => {
     }
 
     ctx.strokeStyle = "rgba(0, 0, 255, 5%)";
-    for(let i = offset; i < Q.length; i += QAM.SYMBOL_LEN) {
+    for(let i = Math.floor(offset); i < Q.length; i += QAM.SYMBOL_LEN) {
         ctx.beginPath();
         for(let j = 0; j <= windowLen; j++) {
             const y = canvas.height * (Q[i + j] + 1) / 2;
@@ -200,7 +214,7 @@ const drawEyePattern = (I, Q) => {
 
 let phaseAdjust = 0;
 let signal = null;
-let offset = Math.floor(QAM.SYMBOL_LEN / 2);
+let offset = 0;
 
 const demodulate = () => {
 
@@ -226,15 +240,39 @@ const demodulate = () => {
             qx += unfilteredQ[i - j] * filter[j];
         }
 
-        filteredI[i] = ix * 2;
-        filteredQ[i] = qx * 2;
+        filteredI[i] = ix;
+        filteredQ[i] = qx;
 
     }
 
     drawWaveforms(filteredI, filteredQ);
-    drawConstellation(filteredI, filteredQ);
     drawEyePattern(filteredI, filteredQ);
     drawSpectrum(signal);
+
+    const points = [];
+
+    // sample constellation
+    for(let i = Math.floor(offset); i < signal.length; i += QAM.SYMBOL_LEN) {
+        const fractional = offset % 1;
+        const instantI = lerp(filteredI[i], filteredI[i+1], fractional),
+              instantQ = lerp(filteredQ[i], filteredQ[i+1], fractional);
+        points.push([instantI, instantQ]);
+    }
+
+    // scale constellation
+    let avgPower = 0;
+    for(const point of points) {
+        avgPower += Math.sqrt(point[0]**2 + point[1]**2);
+    }
+    avgPower /= points.length;
+    for(const point of points) {
+        point[0] *= 0.8695557812922008/avgPower;
+        point[1] *= 0.8695557812922008/avgPower;
+    }
+
+    drawConstellation(points);
+
+    //decodeASCII(filteredI, filteredQ);
 
 };
 
