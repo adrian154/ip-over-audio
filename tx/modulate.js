@@ -104,3 +104,11 @@ for(let i = 0; i < signal.length; i++) {
 fs.writeFileSync("signals/basebandI.raw", Buffer.from(basebandI.buffer));
 fs.writeFileSync("signals/modulated.raw", Buffer.from(signal.buffer));
 writeWav("signals/modulated.wav", [signal], QAM.SAMPLE_RATE);
+
+// scale basebands to write to file
+let max2 = basebandI.reduce((a,c) => Math.max(a, Math.abs(c)), 0);
+for(let i = 0; i < basebandI.length; i++) {
+    basebandI[i] /= max2;
+    basebandQ[i] /= max2;
+}
+writeWav("signals/baseband.wav", [basebandI, basebandQ], QAM.SAMPLE_RATE)

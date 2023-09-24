@@ -8,7 +8,7 @@
 })({
     SAMPLE_RATE: 48000,
     CARRIER_FREQ: 12000,
-    SYMBOL_LEN: 3,
-    MODE: "64-QAM",
-    ROLLOFF: 0.3
+    SYMBOL_LEN: 4,
+    MODE: "64",
+    ROLLOFF: 0.2
 });

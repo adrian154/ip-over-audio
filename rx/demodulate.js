@@ -151,6 +151,7 @@ const drawConstellation = (points) => {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // draw grid
+    ctx.translate(0.5, 0.5);
     const order = ORDER[QAM.MODE];
     for(let i = 1; i < order; i++) {
         ctx.beginPath();
@@ -162,6 +163,7 @@ const drawConstellation = (points) => {
         ctx.lineTo(canvas.width, i / order * canvas.width);
         ctx.stroke();
     }
+    ctx.resetTransform();
 
     // draw points
     ctx.fillStyle = "#3388ff";
